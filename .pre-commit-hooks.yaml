@@ -1,0 +1,8 @@
+- id: check-changelog
+  name: Check PR changelog fragment
+  description: Require a new Scriv fragment for feat and fix commits in a pull request.
+  entry: check-changelog
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [manual]

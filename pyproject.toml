@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pre-commit-checks"
+version = "0.1.0"
+description = "Shared pre-commit checks for Python projects"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [{name = "Frank Hoffmann"}]
+
+[project.scripts]
+check-changelog = "pre_commit_checks.check_changelog:main"
+
+[project.urls]
+Repository = "https://github.com/15r10nk/pre-commit-checks"
+Issues = "https://github.com/15r10nk/pre-commit-checks/issues"
+
+[tool.setuptools.packages.find]
+include = ["pre_commit_checks*"]
