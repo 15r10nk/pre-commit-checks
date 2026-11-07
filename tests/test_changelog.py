@@ -8,7 +8,7 @@ from pathlib import Path
 SCRIPT = Path(__file__).resolve().parents[1] / "pre_commit_checks/check_changelog.py"
 
 
-class ChangelogTests(unittest.TestCase):
+class GitRepositoryTest(unittest.TestCase):
     def setUp(self):
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
@@ -50,6 +50,8 @@ class ChangelogTests(unittest.TestCase):
         self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
         return result
 
+
+class ChangelogTests(GitRepositoryTest):
     def test_feature_and_fix_forms_require_fragment(self):
         for message in (
             "feat: feature",
@@ -127,7 +129,100 @@ class ChangelogTests(unittest.TestCase):
 
     def test_missing_refs_fail_with_instructions(self):
         result = self.check(1, base="")
-        self.assertIn("--from-ref BASE --to-ref HEAD", result.stderr)
+        self.assertIn("Both PRE_COMMIT_FROM_REF and PRE_COMMIT_TO_REF", result.stderr)
 
     def test_invalid_ref_fails(self):
         self.check(1, base="missing-ref")
+
+
+class AutomaticBaseTests(GitRepositoryTest):
+    def setUp(self):
+        super().setUp()
+        self.git("checkout", "-b", "feature")
+
+    def automatic_check(self, expected, args=(), env=None):
+        environment = dict(os.environ)
+        for name in (
+            "PRE_COMMIT_FROM_REF",
+            "PRE_COMMIT_TO_REF",
+            "PRE_COMMIT_REMOTE_NAME",
+        ):
+            environment.pop(name, None)
+        environment.update(env or {})
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
+            cwd=self.root,
+            env=environment,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, expected, result.stdout + result.stderr)
+        return result
+
+    def test_detects_local_main_without_refs(self):
+        self.commit("feat: feature")
+        self.automatic_check(1)
+        self.write("changelog.d/new.md", "Feature\n")
+        self.commit("docs: changelog")
+        self.automatic_check(0)
+
+    def test_prefers_remote_default_branch(self):
+        self.git("update-ref", "refs/remotes/origin/trunk", self.base)
+        self.git(
+            "symbolic-ref", "refs/remotes/origin/HEAD", "refs/remotes/origin/trunk"
+        )
+        self.git("checkout", "main")
+        self.commit("feat: unrelated main change")
+        self.git("checkout", "feature")
+        self.commit("docs: feature documentation")
+        self.automatic_check(0)
+
+    def test_detects_origin_main(self):
+        self.git("update-ref", "refs/remotes/origin/main", self.base)
+        self.git("branch", "-D", "main")
+        self.commit("fix: bug")
+        self.automatic_check(1)
+
+    def test_detects_local_master(self):
+        self.git("branch", "-m", "main", "master")
+        self.commit("fix: bug")
+        self.automatic_check(1)
+
+    def test_configurable_base_branch(self):
+        self.git("branch", "-m", "main", "trunk")
+        self.commit("fix: bug")
+        self.automatic_check(1, args=("--base-ref", "trunk"))
+        result = self.automatic_check(1)
+        self.assertIn("Cannot determine the base branch", result.stderr)
+
+    def test_uncommitted_fragment_is_not_accepted_automatically(self):
+        self.commit("feat: feature")
+        self.write("changelog.d/new.md", "Feature\n")
+        self.git("add", "changelog.d/new.md")
+        self.automatic_check(1)
+
+    def test_push_range_does_not_hide_earlier_feature_commits(self):
+        self.commit("feat: feature")
+        previous_push = self.git("rev-parse", "HEAD").strip()
+        self.commit("docs: more documentation")
+        self.automatic_check(
+            1,
+            env={
+                "PRE_COMMIT_REMOTE_NAME": "origin",
+                "PRE_COMMIT_FROM_REF": previous_push,
+                "PRE_COMMIT_TO_REF": "HEAD",
+            },
+        )
+
+    def test_push_checks_the_branch_being_pushed(self):
+        self.commit("feat: feature")
+        pushed_head = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "main")
+        self.automatic_check(
+            1,
+            env={
+                "PRE_COMMIT_REMOTE_NAME": "origin",
+                "PRE_COMMIT_FROM_REF": self.base,
+                "PRE_COMMIT_TO_REF": pushed_head,
+            },
+        )

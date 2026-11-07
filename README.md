@@ -16,6 +16,8 @@ satisfy the check. Other commit types do not require a fragment.
 Add this to `.pre-commit-config.yaml`:
 
 ```yaml
+default_install_hook_types: [pre-commit, pre-push]
+
 repos:
 - repo: https://github.com/15r10nk/pre-commit-checks
   rev: v0.1.0
@@ -23,17 +25,28 @@ repos:
   - id: check-changelog
 ```
 
-Run against committed changes:
+Install the hooks once with `pre-commit install`. The changelog check then runs
+automatically before `git push`, allowing the fragment to be added in a separate
+commit before pushing. It checks the whole branch, including commits from
+previous pushes, and only accepts committed fragments.
+
+Run manually without specifying refs:
 
 ```sh
-pre-commit run check-changelog --hook-stage manual --from-ref origin/main --to-ref HEAD
+pre-commit run check-changelog --hook-stage manual
 ```
 
-The hook uses the manual stage because it needs the complete PR commit range.
-It does not run automatically on individual commits. Both refs must be available
-locally. In PR CI, check out full history (`fetch-depth: 0`) and use the PR's
-base and head SHAs as `--from-ref` and `--to-ref` respectively. Missing or invalid
-refs fail the check.
+The base branch is detected from `origin/HEAD`, then `origin/main`,
+`origin/master`, `main`, or `master`. Keep remote references up to date with
+`git fetch`; the hook does not access the network. To override the default,
+configure `args: [--base-ref, YOUR_BASE_BRANCH]` on the hook.
+
+In PR CI, check out full history (`fetch-depth: 0`) and pass the PR's exact
+base and head SHAs as `--from-ref` and `--to-ref`. Explicit refs take precedence
+in manual mode; both must be provided. During a push, the hook uses the pushed
+head and the detected base branch, because the push range alone would miss
+feature commits from earlier pushes. Missing base branches or invalid refs fail
+with an actionable message.
 
 Create a fragment with `uv run scriv create --add --edit` and commit it before
 rerunning the check.
