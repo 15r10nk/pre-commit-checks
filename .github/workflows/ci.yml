@@ -21,3 +21,19 @@ jobs:
     - run: python -m pip install . pre-commit
     - run: python -m unittest discover -s tests
     - run: pre-commit validate-manifest .pre-commit-hooks.yaml
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      with:
+        fetch-depth: 0
+    - uses: j178/prek-action@44924fe9ef4a6f88253c4b6b1bf11c689d3ce53d # v3.1.0
+      with:
+        prek-version: 0.5.10
+    - name: Check PR changelog
+      if: github.event_name == 'pull_request'
+      env:
+        PRE_COMMIT_FROM_REF: ${{github.event.pull_request.base.sha}}
+        PRE_COMMIT_TO_REF: ${{github.event.pull_request.head.sha}}
+      run: prek run check-changelog --stage manual

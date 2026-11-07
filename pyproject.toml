@@ -13,6 +13,7 @@ authors = [{name = "Frank Hoffmann"}]
 
 [project.scripts]
 check-changelog = "pre_commit_checks.check_changelog:main"
+check-tracked-ignored = "pre_commit_checks.check_tracked_ignored:main"
 
 [project.urls]
 Repository = "https://github.com/15r10nk/pre-commit-checks"
@@ -20,3 +21,12 @@ Issues = "https://github.com/15r10nk/pre-commit-checks/issues"
 
 [tool.setuptools.packages.find]
 include = ["pre_commit_checks*"]
+
+[tool.commitizen]
+version_provider = "pep621"
+version_scheme = "semver"
+tag_format = "v$version"
+major_version_zero = true
+
+[tool.scriv]
+format = "md"

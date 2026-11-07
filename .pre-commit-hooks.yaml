@@ -6,3 +6,12 @@
   pass_filenames: false
   always_run: true
   stages: [pre-push, manual]
+
+- id: check-tracked-ignored
+  name: Check tracked files against .gitignore
+  description: Reject tracked files matched by repository .gitignore rules.
+  entry: check-tracked-ignored
+  language: python
+  pass_filenames: false
+  always_run: true
+  stages: [pre-commit, pre-push, manual]
